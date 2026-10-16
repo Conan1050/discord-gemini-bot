@@ -91,26 +91,38 @@ async def on_message(message: discord.Message):
         return
 
     async with message.channel.typing():
-        try:
-            # เรียกใช้งาน Gemini ทันทีโดยไม่ต้องแท็ก
-            response = ai_client.models.generate_content(
-                model=MODEL_NAME,
-                contents=full_prompt,
-                config=get_model_config()
-            )
-            
-            reply_text = response.text if response.text else "ขออภัยครับ ไม่สามารถสร้างคำตอบได้ในขณะนี้"
-            
+        # รายชื่อโมเดลที่จะลองเรียกตามลำดับ หากตัวแรกติด 503 High Demand
+        models_to_try = [MODEL_NAME, "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]
+        # กำจัดตัวซ้ำและคงลำดับเดิมไว้
+        unique_models = list(dict.fromkeys([m for m in models_to_try if m]))
+        
+        reply_text = None
+        last_error = None
+
+        for model in unique_models:
+            try:
+                response = ai_client.models.generate_content(
+                    model=model,
+                    contents=full_prompt,
+                    config=get_model_config()
+                )
+                if response and response.text:
+                    reply_text = response.text
+                    break
+            except Exception as e:
+                last_error = e
+                print(f"⚠️ โมเดล {model} เกิดข้อผิดพลาด: {e} กำลังลองโมเดลถัดไป...")
+                continue
+
+        if reply_text:
             chunks = split_message(reply_text)
             for i, chunk in enumerate(chunks):
                 if i == 0:
                     await message.reply(chunk)
                 else:
                     await message.channel.send(chunk)
-
-        except Exception as e:
-            print(f"เกิดข้อผิดพลาด: {e}")
-            await message.reply(f"เกิดข้อผิดพลาดในการประมวลผลโค้ด: `{e}`")
+        else:
+            await message.reply(f"ขออภัยครับ ระบบ AI กำลังมีผู้ใช้งานหนาแน่นมาก กรุณาลองใหม่อีกครั้งในอีกสักครู่ (`{last_error}`)")
 
     await bot.process_commands(message)
 
