@@ -58,51 +58,42 @@ async def extract_attachments(message: discord.Message) -> str:
 
 @bot.event
 async def on_message(message: discord.Message):
-    # ข้ามข้อความจากบอท
+    # ข้ามข้อความจากบอท (ป้องกันบอทคุยกับตัวเอง)
     if message.author.bot:
         return
 
-    # เช็คว่ามีคนแท็กบอท หรือ reply บอทหรือไม่
-    is_mentioned = bot.user in message.mentions
-    is_reply_to_bot = (
-        message.reference 
-        and message.reference.resolved 
-        and isinstance(message.reference.resolved, discord.Message)
-        and message.reference.resolved.author == bot.user
-    )
+    # ดึงข้อความและตัดแท็กบอทออก (ถ้ามี)
+    clean_prompt = message.clean_content.replace(f"@{bot.user.name}", "").strip()
+    
+    # อ่านไฟล์แนบโค้ด/ข้อความ (ถ้ามี)
+    attached_files_content = await extract_attachments(message)
+    full_prompt = clean_prompt + attached_files_content
 
-    if is_mentioned or is_reply_to_bot:
-        clean_prompt = message.clean_content.replace(f"@{bot.user.name}", "").strip()
-        
-        # อ่านไฟล์แนบ (ถ้ามี)
-        attached_files_content = await extract_attachments(message)
-        full_prompt = clean_prompt + attached_files_content
+    # ถ้าไม่มีข้อความเลย ข้ามไป
+    if not full_prompt.strip():
+        return
 
-        if not full_prompt.strip():
-            await message.reply("สวัสดีครับ! ผมคือ Antibro Coding AI 💻 ส่งโค้ด ปัญหาบั๊ก หรือไฟล์โค้ดมาให้ผมช่วยวิเคราะห์ได้เลยครับ!")
-            return
+    async with message.channel.typing():
+        try:
+            # เรียกใช้งาน Gemini ทันทีโดยไม่ต้องแท็ก
+            response = ai_client.models.generate_content(
+                model=MODEL_NAME,
+                contents=full_prompt,
+                config=get_model_config()
+            )
+            
+            reply_text = response.text if response.text else "ขออภัยครับ ไม่สามารถสร้างคำตอบได้ในขณะนี้"
+            
+            chunks = split_message(reply_text)
+            for i, chunk in enumerate(chunks):
+                if i == 0:
+                    await message.reply(chunk)
+                else:
+                    await message.channel.send(chunk)
 
-        async with message.channel.typing():
-            try:
-                # เรียกใช้งาน Gemini ด้วย Coding Config
-                response = ai_client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=full_prompt,
-                    config=get_model_config()
-                )
-                
-                reply_text = response.text if response.text else "ขออภัยครับ ไม่สามารถสร้างคำตอบได้ในขณะนี้"
-                
-                chunks = split_message(reply_text)
-                for i, chunk in enumerate(chunks):
-                    if i == 0:
-                        await message.reply(chunk)
-                    else:
-                        await message.channel.send(chunk)
-
-            except Exception as e:
-                print(f"เกิดข้อผิดพลาด: {e}")
-                await message.reply(f"เกิดข้อผิดพลาดในการประมวลผลโค้ด: `{e}`")
+        except Exception as e:
+            print(f"เกิดข้อผิดพลาด: {e}")
+            await message.reply(f"เกิดข้อผิดพลาดในการประมวลผลโค้ด: `{e}`")
 
     await bot.process_commands(message)
 
