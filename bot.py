@@ -74,9 +74,13 @@ async def call_gemini_with_fallback(prompt: str):
     # วนลูปตามจำนวน Key ที่มี
     for key_attempt in range(len(clients)):
         client = get_next_client()
+        key_exhausted = False
         
         # วนลูปโมเดลที่ใช้งานได้จริง
         for model in ACTIVE_MODELS:
+            if key_exhausted:
+                break
+                
             # ลองซ้ำสูงสุด 2 ครั้งสำหรับแต่ละโมเดล (กรณีติด 503 Spike ชั่วคราว)
             for retry in range(2):
                 try:
@@ -90,13 +94,19 @@ async def call_gemini_with_fallback(prompt: str):
                 except Exception as e:
                     last_error = e
                     err_str = str(e)
-                    print(f"⚠️ Key #{key_attempt+1} Model {model} (รอบที่ {retry+1}): {err_str}")
+                    print(f"⚠️ Key #{key_attempt+1} Model {model} (รอบที่ {retry+1}): {err_str[:120]}")
                     
-                    # ถ้าเจอ 503 รอ 1.5 วินาทีแล้วลองใหม่
+                    # ถ้าเจอ 503 รอ 1 วินาทีแล้วลองซ้ำ
                     if "503" in err_str:
-                        await asyncio.sleep(1.5)
+                        await asyncio.sleep(1.0)
                         continue
-                    # ถ้า 429 Quota เต็ม หรือ 404 ให้ข้ามไปโมเดล/Key ถัดไปทันที
+                    
+                    # ถ้าเจอ 429 Quota เต็ม ให้หยุดใช้ Key นี้แล้วข้ามไป Key ใหม่ทันที
+                    if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                        key_exhausted = True
+                        break
+                    
+                    # Error อื่นๆ ให้ข้ามไปโมเดลถัดไป
                     break
 
     return None, last_error
@@ -153,7 +163,9 @@ async def on_message(message: discord.Message):
                 else:
                     await message.channel.send(chunk)
         else:
-            await message.reply(f"ขออภัยครับ ตอนนี้เซิร์ฟเวอร์ AI มีคิวหนาแน่นมาก กรุณาลองใหม่อีกครั้งในอีกสักครู่ (`{err}`)")
+            # ตัดข้อความ error ไม่ให้เกินขีดจำกัด Discord (2000 ตัวอักษร)
+            err_summary = str(err)[:1500] if err else "ไม่ทราบสาเหตุ"
+            await message.reply(f"ขออภัยครับ ระบบ AI เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งในอีกสักครู่:\n```{err_summary}```")
 
     await bot.process_commands(message)
 
