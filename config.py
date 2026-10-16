@@ -5,10 +5,8 @@ from google.genai import types
 # การตั้งค่าโมเดลและพฤติกรรม (System Instruction)
 # ----------------------------------------------------
 
-# โมเดลแนะนำ:
-# - "gemini-2.5-pro": ฉลาดและเก่งโค้ดที่สุด แก้บั๊กตรรกะซับซ้อนได้ดีเยี่ยม
-# - "gemini-2.5-flash": ตอบเร็วมาก และเก่งเรื่องโค้ดระดับดีมาก
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
+# โมเดลล่าสุดของ Gemini
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 # System Prompt ที่ปรับจูนมาเพื่อการเป็น Coding Specialist / AI Pair Programmer (แบบ Antigravity)
 CODING_SYSTEM_INSTRUCTION = """
@@ -37,3 +35,4 @@ def get_model_config():
         temperature=0.2,        # ต่ำเพื่อให้คำตอบแม่นยำ ไม่สุ่ม และเป็นไปตามหลักการเขียนโค้ด
         top_p=0.95,
     )
+
