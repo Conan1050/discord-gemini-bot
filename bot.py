@@ -61,11 +61,19 @@ async def on_message(message: discord.Message):
     if message.author.bot:
         return
 
-    # เช็คเงื่อนไข:
-    # 1. อยู่ในห้อง anti-bot (ตอบอัตโนมัติ ไม่ต้องแท็ก)
-    # 2. หรือ ถูกแท็ก / reply บอท ในห้องอื่นๆ
-    channel_name = getattr(message.channel, "name", "")
-    is_in_allowed_channel = channel_name.lower() == ALLOWED_CHANNEL_NAME.lower()
+    # ดึงชื่อห้อง (รองรับทั้ง Text Channel และ Thread)
+    channel = message.channel
+    channel_name = getattr(channel, "name", "")
+    if hasattr(channel, "parent") and channel.parent:
+        channel_name = channel.parent.name or channel_name
+
+    # เช็คเงื่อนไขตอบอัตโนมัติ:
+    # 1. ชื่อห้องตรงกับ ALLOWED_CHANNEL_NAME หรือมีคำว่า 'anti-bot' อยู่ในชื่อห้อง
+    # 2. หรือ ถูกแท็ก / reply บอท ในห้องใดๆ ก็ตาม
+    is_in_allowed_channel = (
+        ALLOWED_CHANNEL_NAME.lower() in channel_name.lower() 
+        or "anti-bot" in channel_name.lower()
+    )
     is_mentioned = bot.user in message.mentions
     is_reply_to_bot = (
         message.reference 
@@ -73,6 +81,12 @@ async def on_message(message: discord.Message):
         and isinstance(message.reference.resolved, discord.Message)
         and message.reference.resolved.author == bot.user
     )
+
+    # คำสั่งทดสอบ ping ทำงานเสมอถ้าอยู่ในห้องบอท หรือแท็กบอท
+    if (is_in_allowed_channel or is_mentioned or is_reply_to_bot) and message.content.strip().lower() in ["ping", "!ping"]:
+        latency_ms = round(bot.latency * 1000)
+        await message.reply(f"Pong! 🏓 (Latency: {latency_ms}ms)\nห้องปัจจุบัน: `#{channel_name}` บอทพร้อมทำงานครับ!")
+        return
 
     if not (is_in_allowed_channel or is_mentioned or is_reply_to_bot):
         # ถ้าไม่อยู่ในห้อง anti-bot และไม่ได้แท็กบอท ให้ข้ามไป
