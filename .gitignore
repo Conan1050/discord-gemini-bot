@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 venv/
 test_bot.py
+check_models.py
 

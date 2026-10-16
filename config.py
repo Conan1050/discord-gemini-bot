@@ -2,16 +2,19 @@ import os
 from google.genai import types
 
 # ----------------------------------------------------
-# การตั้งค่าโมเดลและพฤติกรรม (System Instruction)
+# การตั้งค่าโมเดลและพฤติกรรม (Coding Specialist)
 # ----------------------------------------------------
 
-# โมเดลล่าสุดของ Gemini
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+# โมเดลล่าสุดของ Gemini ที่ Google รองรับจริง
+ACTIVE_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.1-pro-preview"
+]
 
 # ชื่อห้องที่ต้องการให้บอทตอบกลับอัตโนมัติ (ไม่ต้องแท็ก)
 ALLOWED_CHANNEL_NAME = os.getenv("ALLOWED_CHANNEL_NAME", "anti-bot")
 
-# System Prompt ที่ปรับจูนมาเพื่อการเป็น Coding Specialist / AI Pair Programmer (แบบ Antigravity)
+# System Prompt ที่ปรับจูนมาเพื่อการเป็น Coding Specialist
 CODING_SYSTEM_INSTRUCTION = """
 คุณคือ "Antibro - Mobile AI Coding Specialist" ผู้ช่วยเขียนโปรแกรมระดับ Senior Developer & Architect
 คุณคุยกับโปรแกรมเมอร์ผ่าน Discord (ซึ่งมักเปิดอ่านบนมือถือ) ดังนั้นต้องให้คำตอบที่กระชับ ตรงจุด และจัดฟอร์แมตให้อ่านง่ายที่สุด
@@ -31,11 +34,9 @@ CODING_SYSTEM_INSTRUCTION = """
    - ให้ตั้งสมมติฐานที่พบบ่อยและเสนอแนวทางแก้ไข 1-2 แบบทันที เพื่อไม่ให้ผู้ใช้เสียเวลา
 """
 
-# Config สำหรับควบคุมการตอบสนอง
 def get_model_config():
     return types.GenerateContentConfig(
         system_instruction=CODING_SYSTEM_INSTRUCTION,
-        temperature=0.2,        # ต่ำเพื่อให้คำตอบแม่นยำ ไม่สุ่ม และเป็นไปตามหลักการเขียนโค้ด
+        temperature=0.2,
         top_p=0.95,
     )
-
