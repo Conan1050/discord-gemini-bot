@@ -8,6 +8,9 @@ from google.genai import types
 # โมเดลล่าสุดของ Gemini
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
+# ชื่อห้องที่ต้องการให้บอทตอบกลับอัตโนมัติ (ไม่ต้องแท็ก)
+ALLOWED_CHANNEL_NAME = os.getenv("ALLOWED_CHANNEL_NAME", "anti-bot")
+
 # System Prompt ที่ปรับจูนมาเพื่อการเป็น Coding Specialist / AI Pair Programmer (แบบ Antigravity)
 CODING_SYSTEM_INSTRUCTION = """
 คุณคือ "Antibro - Mobile AI Coding Specialist" ผู้ช่วยเขียนโปรแกรมระดับ Senior Developer & Architect

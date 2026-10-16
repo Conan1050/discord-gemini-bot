@@ -2,7 +2,7 @@ import os
 import discord
 from discord.ext import commands
 from google import genai
-from config import MODEL_NAME, get_model_config
+from config import MODEL_NAME, ALLOWED_CHANNEL_NAME, get_model_config
 
 # อ่านค่าจาก Environment Variables
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -24,7 +24,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"🤖 Antibro (Coding AI) พร้อมทำงานแล้ว! ล็อกอินในชื่อ: {bot.user.name}")
     print(f"🧠 โมเดลที่ใช้งาน: {MODEL_NAME}")
-    await bot.change_presence(activity=discord.Game(name=f"Coding Specialist ({MODEL_NAME}) | แท็ก @ เพื่อถามโค้ด"))
+    print(f"💬 ห้องที่ตอบอัตโนมัติ: #{ALLOWED_CHANNEL_NAME}")
+    await bot.change_presence(activity=discord.Game(name=f"คุยได้ทันทีใน #{ALLOWED_CHANNEL_NAME}"))
 
 def split_message(text, limit=1950):
     """แบ่งข้อความหากยาวเกินขีดจำกัดของ Discord (2,000 ตัวอักษร)"""
@@ -43,11 +44,9 @@ async def extract_attachments(message: discord.Message) -> str:
     """อ่านเนื้อหาไฟล์โค้ดหรือข้อความที่แนบมาด้วย (เช่น .py, .js, .txt, .log)"""
     extra_text = ""
     for attachment in message.attachments:
-        # จำกัดขนาดไฟล์ไม่เกิน 1 MB เพื่อป้องกันหน่วยความจำล้น
         if attachment.size <= 1_000_000:
             try:
                 content_bytes = await attachment.read()
-                # ลอง decode เป็น utf-8
                 decoded = content_bytes.decode("utf-8")
                 extra_text += f"\n\n--- ไฟล์แนบ: `{attachment.filename}` ---\n```\n{decoded}\n```"
             except UnicodeDecodeError:
@@ -60,6 +59,24 @@ async def extract_attachments(message: discord.Message) -> str:
 async def on_message(message: discord.Message):
     # ข้ามข้อความจากบอท (ป้องกันบอทคุยกับตัวเอง)
     if message.author.bot:
+        return
+
+    # เช็คเงื่อนไข:
+    # 1. อยู่ในห้อง anti-bot (ตอบอัตโนมัติ ไม่ต้องแท็ก)
+    # 2. หรือ ถูกแท็ก / reply บอท ในห้องอื่นๆ
+    channel_name = getattr(message.channel, "name", "")
+    is_in_allowed_channel = channel_name.lower() == ALLOWED_CHANNEL_NAME.lower()
+    is_mentioned = bot.user in message.mentions
+    is_reply_to_bot = (
+        message.reference 
+        and message.reference.resolved 
+        and isinstance(message.reference.resolved, discord.Message)
+        and message.reference.resolved.author == bot.user
+    )
+
+    if not (is_in_allowed_channel or is_mentioned or is_reply_to_bot):
+        # ถ้าไม่อยู่ในห้อง anti-bot และไม่ได้แท็กบอท ให้ข้ามไป
+        await bot.process_commands(message)
         return
 
     # ดึงข้อความและตัดแท็กบอทออก (ถ้ามี)
